@@ -9,8 +9,8 @@ import (
 	"strings"
 )
 
-// GitHub URL正则表达式
-var githubRegex = regexp.MustCompile(`(?:^|[\s'"(=,\[{;|&<>])https?://(?:github\.com|raw\.githubusercontent\.com|raw\.github\.com|gist\.githubusercontent\.com|gist\.github\.com|api\.github\.com)[^\s'")]*`)
+// 需要被代理重写的下载URL正则表达式
+var githubRegex = regexp.MustCompile(`(?:^|[\s'"(=,\[{;|&<>])https?://(?:github\.com|raw\.githubusercontent\.com|raw\.github\.com|gist\.githubusercontent\.com|gist\.github\.com|api\.github\.com|downloads\.sourceforge\.net|sourceforge\.net|[\w-]+\.dl\.sourceforge\.net)[^\s'")]*`)
 
 // MaxShellSize 限制最大处理大小为 10MB
 const MaxShellSize = 10 * 1024 * 1024
@@ -26,7 +26,9 @@ func ProcessSmart(input io.Reader, isCompressed bool, host string) (io.Reader, i
 		return strings.NewReader(""), 0, nil
 	}
 
-	if !bytes.Contains(content, []byte("github.com")) && !bytes.Contains(content, []byte("githubusercontent.com")) {
+	if !bytes.Contains(content, []byte("github.com")) &&
+		!bytes.Contains(content, []byte("githubusercontent.com")) &&
+		!bytes.Contains(content, []byte("sourceforge.net")) {
 		return bytes.NewReader(content), int64(len(content)), nil
 	}
 

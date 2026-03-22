@@ -26,6 +26,9 @@ var (
 		regexp.MustCompile(`^(?:https?://)?cdn-lfs\.hf\.co(?:/spaces)?/([^/]+)/([^/]+)(?:/(.*))?`),
 		regexp.MustCompile(`^(?:https?://)?download\.docker\.com/([^/]+)/.*\.(tgz|zip)`),
 		regexp.MustCompile(`^(?:https?://)?(github|opengraph)\.githubassets\.com/([^/]+)/.+?`),
+		regexp.MustCompile(`^(?:https?://)?downloads\.sourceforge\.net/project/.+`),
+		regexp.MustCompile(`^(?:https?://)?sourceforge\.net/projects/.+/files/.+`),
+		regexp.MustCompile(`^(?:https?://)?\w+\.dl\.sourceforge\.net/.+`),
 	}
 )
 
@@ -58,6 +61,12 @@ func GitHubProxyHandler(c *gin.Context) {
 
 	matches := CheckGitHubURL(rawPath)
 	if matches != nil {
+		// 仅对可提取 owner/repo 的 GitHub 类链接做仓库访问控制。
+		// SourceForge 等下载链接不包含仓库信息，跳过该检查。
+		if len(matches) < 2 {
+			ProxyGitHubRequest(c, rawPath)
+			return
+		}
 		if allowed, reason := utils.GlobalAccessController.CheckGitHubAccess(matches); !allowed {
 			var repoPath string
 			if len(matches) >= 2 {

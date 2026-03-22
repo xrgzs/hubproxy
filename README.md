@@ -14,6 +14,7 @@
 - 🐳 **Docker 镜像加速** - 支持 Docker Hub、GHCR、Quay 等多个镜像仓库加速，流式传输优化拉取速度。
 - 🐳 **离线镜像包** - 支持下载离线镜像包，流式传输加防抖设计。
 - 📁 **GitHub 文件加速** - 加速 GitHub Release、Raw 文件下载，支持`api.github.com`，脚本嵌套加速等等
+- 📦 **SourceForge 下载加速** - 支持 `downloads.sourceforge.net`、`sourceforge.net/projects/.../files/...` 和 `*.dl.sourceforge.net`
 - 🤖 **AI 模型库支持** - 支持 Hugging Face 模型下载加速
 - 🛡️ **智能限流** - IP 限流保护，防止滥用
 - 🚫 **仓库审计** - 强大的自定义黑名单，白名单，同时审计镜像仓库，和GitHub仓库
