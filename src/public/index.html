@@ -1,832 +1,1168 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-CN">
+
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Github文件加速、docker镜像加速">
-    <meta name="keywords" content="Github、文件加速、ghproxy、docker镜像加速">
-    <meta name="color-scheme" content="dark light">
-    <title>Github、Docker加速</title>
-    <link rel="icon" href="/favicon.ico">
-    <style>
-        :root {
-            --background: #ffffff;
-            --foreground: #0f172a;
-            --card: #ffffff;
-            --card-foreground: #0f172a;
-            --primary: #2563eb;
-            --primary-foreground: #f8fafc;
-            --secondary: #f1f5f9;
-            --secondary-foreground: #0f172a;
-            --muted: #f1f5f9;
-            --muted-foreground: #64748b;
-            --accent: #f1f5f9;
-            --accent-foreground: #0f172a;
-            --border: #e2e8f0;
-            --input: #ffffff;
-            --ring: #2563eb;
-            --radius: 0.5rem;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="description" content="狗子的 HubProxy - GitHub 加速、Docker 镜像搜索与离线下载">
+  <meta name="keywords" content="狗子的 HubProxy, GitHub 加速, Docker 镜像搜索, Docker 离线下载">
+  <title>狗子的 HubProxy</title>
+  <link rel="icon" href="/favicon.ico">
+  <link rel="stylesheet" href="https://s4.zstatic.net/npm/mdui@2.1.4/mdui.css">
+  <script src="https://s4.zstatic.net/npm/mdui@2.1.4/mdui.global.js"></script>
+  <link rel="stylesheet" href="https://s4.zstatic.net/npm/material-icons@1.13.14/iconfont/material-icons.css">
+  <link rel="stylesheet" href="https://s4.zstatic.net/npm/@fontsource/roboto@5.2.10/index.css">
+  <style>
+    :root {
+      --app-max-width: 1080px;
+      --gap: 14px;
+    }
 
-        .dark {
-            --background: #0f172a;
-            --foreground: #f8fafc;
-            --card: #1e293b;
-            --card-foreground: #f8fafc;
-            --primary: #3b82f6;
-            --primary-foreground: #f8fafc;
-            --secondary: #1e293b;
-            --secondary-foreground: #f8fafc;
-            --muted: #1e293b;
-            --muted-foreground: #94a3b8;
-            --accent: #1e293b;
-            --accent-foreground: #f8fafc;
-            --border: #334155;
-            --input: #1e293b;
-            --ring: #3b82f6;
-        }
+    .app-main {
+      width: 100%;
+      max-width: var(--app-max-width);
+      margin: 0 auto;
+    }
 
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --background: #0f172a;
-                --foreground: #f8fafc;
-                --card: #1e293b;
-                --card-foreground: #f8fafc;
-                --primary: #3b82f6;
-                --primary-foreground: #f8fafc;
-                --secondary: #1e293b;
-                --secondary-foreground: #f8fafc;
-                --muted: #1e293b;
-                --muted-foreground: #94a3b8;
-                --accent: #1e293b;
-                --accent-foreground: #f8fafc;
-                --border: #334155;
-                --input: #1e293b;
-                --ring: #3b82f6;
-            }
-        }
+    .view {
+      display: none;
+      gap: var(--gap);
+      padding: 16px 14px 20px;
+    }
 
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+    .view.active {
+      display: grid;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-            background-color: var(--background);
-            color: var(--foreground);
-            line-height: 1.5;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            transition: background-color 0.3s, color 0.3s;
-        }
+    .card-content {
+      padding: 16px;
+      display: grid;
+      gap: 12px;
+    }
 
-        .navbar {
-            position: sticky;
-            top: 0;
-            z-index: 50;
-            width: 100%;
-            border-bottom: 1px solid var(--border);
-            background-color: var(--background);
-            backdrop-filter: blur(8px);
-            background-color: rgba(255, 255, 255, 0.95);
-        }
+    .desc {
+      margin: 0;
+      color: rgb(var(--mdui-color-on-surface-variant));
+      line-height: 1.65;
+    }
 
-        .dark .navbar {
-            background-color: rgba(15, 23, 42, 0.95);
-        }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
 
-        .navbar-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            height: 4rem;
-        }
+    .inline-row {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 12px;
+      align-items: end;
+    }
 
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            color: var(--foreground);
-            font-weight: 600;
-            font-size: 1.125rem;
-        }
+    .output-wrap {
+      display: none;
+      gap: 10px;
+    }
 
-        .logo-icon {
-            width: 2rem;
-            height: 2rem;
-            border-radius: 0.5rem;
-            background: linear-gradient(135deg, var(--primary), #3b82f6);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-        }
+    .output-wrap.show {
+      display: grid;
+    }
 
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+    .code-box {
+      margin: 0;
+      padding: 10px 12px;
+      border-radius: var(--mdui-shape-corner-small);
+      background: rgb(var(--mdui-color-surface-container-high));
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      word-break: break-all;
+      line-height: 1.6;
+    }
 
-        .nav-link {
-            padding: 0.5rem 1rem;
-            border-radius: var(--radius);
-            text-decoration: none;
-            color: var(--muted-foreground);
-            transition: all 0.2s;
-            font-weight: 500;
-        }
+    .result-grid {
+      display: grid;
+      gap: 10px;
+    }
 
-        .nav-link:hover,
-        .nav-link.active {
-            color: var(--foreground);
-            background-color: var(--muted);
-        }
+    .meta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      color: rgb(var(--mdui-color-on-surface-variant));
+      font-size: 0.92rem;
+    }
 
-        .theme-toggle {
-            padding: 0.5rem;
-            border: none;
-            border-radius: var(--radius);
-            background-color: transparent;
-            color: var(--muted-foreground);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
+    .meta-row span {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      line-height: 1;
+    }
 
-        .theme-toggle:hover {
-            background-color: var(--muted);
-            color: var(--foreground);
-        }
+    .meta-row mdui-icon {
+      font-size: 1rem;
+    }
 
-        .main {
-            flex: 1;
-            padding: 2rem 1rem;
-        }
+    .title-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      font-size: 1.06rem;
+      font-weight: 600;
+    }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 3px 10px;
+      background: rgb(var(--mdui-color-secondary-container));
+      color: rgb(var(--mdui-color-on-secondary-container));
+      font-size: 0.8rem;
+    }
 
-        .hero {
-            text-align: center;
-            margin-bottom: 3rem;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.6s ease-out forwards;
-        }
+    .pagination {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
 
-        .hero-title {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--primary), #3b82f6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
+    .tag-collapse-body {
+      margin-left: 2.5rem;
+      padding: 4px 0 12px;
+      display: grid;
+      gap: 8px;
+    }
 
-        .hero-subtitle {
-            font-size: 1.125rem;
-            color: var(--muted-foreground);
-            max-width: 600px;
-            margin: 0 auto;
-        }
+    .tag-command-box {
+      margin: 0;
+      white-space: pre-wrap;
+    }
 
-        .card {
-            background-color: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 0.75rem;
-            padding: 1.5rem;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-            margin-bottom: 2rem;
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.6s ease-out 0.2s forwards;
-        }
+    .hidden {
+      display: none;
+    }
 
-        .card-header {
-            margin-bottom: 1.5rem;
-        }
+    .form-grid {
+      display: grid;
+      gap: 12px;
+    }
 
-        .card-title {
-            font-size: 1.25rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+    .switch-row {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 10px;
+      align-items: center;
+      padding: 8px 0;
+    }
 
-        .card-description {
-            color: var(--muted-foreground);
-            font-size: 0.875rem;
-        }
+    .switch-title {
+      font-size: 0.95rem;
+    }
 
-        .form-group {
-            margin-bottom: 1rem;
-        }
+    .switch-hint {
+      font-size: 0.84rem;
+      color: rgb(var(--mdui-color-on-surface-variant));
+      margin-top: 2px;
+    }
 
-        .input-container {
-            position: relative;
-            display: flex;
-            gap: 0.75rem;
-        }
+    .app-rail,
+    .app-bottom-bar {
+      position: fixed !important;
+    }
 
-        .input {
-            flex: 1;
-            padding: 0.75rem 1rem;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            background-color: var(--input);
-            color: var(--foreground);
-            font-size: 1rem;
-            transition: all 0.2s;
-        }
+    .app-rail[hidden],
+    .app-bottom-bar[hidden] {
+      display: none !important;
+    }
 
-        .input:focus {
-            outline: none;
-            border-color: var(--ring);
-            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
-        }
+    html.bp-md-down .feature-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 
-        .input::placeholder {
-            color: var(--muted-foreground);
-        }
+    html.bp-md-down,
+    html.bp-md-down html.bp-md-down .inline-row {
+      grid-template-columns: 1fr;
+    }
 
-        .button {
-            padding: 0.75rem 1.5rem;
-            border: none;
-            border-radius: var(--radius);
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .button-primary {
-            background-color: var(--primary);
-            color: var(--primary-foreground);
-        }
-
-        .button-primary:hover {
-            background-color: #1d4ed8;
-            transform: translateY(-1px);
-        }
-
-        .button-secondary {
-            background-color: var(--secondary);
-            color: var(--secondary-foreground);
-        }
-
-        .button-secondary:hover {
-            background-color: var(--muted);
-        }
-
-        .output-container {
-            margin-top: 1.5rem;
-            display: none;
-            opacity: 0;
-            transform: translateY(10px);
-            transition: all 0.3s;
-        }
-
-        .output-container.show {
-            display: block;
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .success-header {
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            margin-bottom: 1rem;
-            color: #059669;
-        }
-
-        .output-box {
-            background-color: var(--muted);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 1rem;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.875rem;
-            word-break: break-all;
-            position: relative;
-            margin-bottom: 1rem;
-        }
-
-        .output-actions {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .docker-info {
-            opacity: 0;
-            transform: translateY(20px);
-            animation: fadeInUp 0.6s ease-out 0.4s forwards;
-        }
-
-        .docker-button {
-            width: 100%;
-            padding: 1rem;
-            background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: all 0.3s;
-            font-size: 1rem;
-            font-weight: 500;
-            color: var(--foreground);
-        }
-
-        .docker-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .dark .docker-button {
-            background: linear-gradient(135deg, #374151, #4b5563);
-        }
-
-        .dark .docker-button:hover {
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-        }
-
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: none;
-            align-items: center;
-            justify-content: center;
-            z-index: 1000;
-            backdrop-filter: blur(4px);
-        }
-
-        .modal-content {
-            background-color: var(--card);
-            border-radius: 0.75rem;
-            padding: 2rem;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-            position: relative;
-            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
-        }
-
-        .modal-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .modal-title {
-            font-size: 1.5rem;
-            font-weight: 600;
-            margin-bottom: 0.5rem;
-        }
-
-        .close-button {
-            position: absolute;
-            top: 1rem;
-            right: 1rem;
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: var(--muted-foreground);
-            padding: 0.25rem;
-            border-radius: var(--radius);
-        }
-
-        .close-button:hover {
-            background-color: var(--muted);
-        }
-
-        .domain-examples {
-            background-color: var(--muted);
-            border-radius: var(--radius);
-            padding: 1rem;
-            font-family: 'Consolas', 'Monaco', monospace;
-            font-size: 0.875rem;
-            line-height: 1.6;
-        }
-
-        .domain-examples strong {
-            color: var(--foreground);
-            display: block;
-            margin: 1rem 0 0.5rem 0;
-        }
-
-        .domain-examples strong:first-child {
-            margin-top: 0;
-        }
-
-        .toast {
-            position: fixed;
-            top: 1rem;
-            right: 1rem;
-            background-color: var(--primary);
-            color: var(--primary-foreground);
-            padding: 1rem 1.5rem;
-            border-radius: var(--radius);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-            z-index: 1001;
-            display: none;
-            opacity: 0;
-            transform: translateX(100%);
-            transition: all 0.3s ease;
-        }
-
-        .toast.show {
-            display: block;
-            opacity: 1;
-            transform: translateX(0);
-        }
-
-        .footer {
-            padding: 2rem 1rem;
-            text-align: center;
-            border-top: 1px solid var(--border);
-        }
-
-        .github-link {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            color: var(--muted-foreground);
-            text-decoration: none;
-            transition: color 0.2s;
-        }
-
-        .github-link:hover {
-            color: var(--foreground);
-        }
-
-        @keyframes fadeInUp {
-            from {
-                opacity: 0;
-                transform: translateY(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        @media (max-width: 768px) {
-            .hero-title {
-                font-size: 2rem;
-            }
-            
-            .nav-links {
-                position: fixed;
-                top: 70px;
-                left: 0;
-                right: 0;
-                background: var(--background);
-                border: 1px solid var(--border);
-                border-top: none;
-                border-radius: 0 0 12px 12px;
-                padding: 1rem;
-                flex-direction: column;
-                gap: 0.5rem;
-                z-index: 1000;
-                transform: translateY(-100vh);
-                transition: transform 0.3s ease;
-            }
-            
-            .nav-links.active {
-                transform: translateY(0);
-            }
-            
-            .mobile-menu-toggle {
-                display: block !important;
-                background: none;
-                border: none;
-                color: var(--foreground);
-                font-size: 1.5rem;
-                cursor: pointer;
-                padding: 0.5rem;
-                border-radius: var(--radius);
-                transition: background-color 0.2s;
-            }
-            
-            .mobile-menu-toggle:hover {
-                background-color: var(--muted);
-            }
-            
-            .navbar-container {
-                justify-content: space-between !important;
-            }
-            
-            .container {
-                padding: 0 1rem;
-            }
-            
-            .modal-content {
-                padding: 1.5rem;
-            }
-            
-            .input-container {
-                flex-direction: column;
-                gap: 1rem;
-            }
-            
-            .input {
-                font-size: 16px;
-            }
-            
-            .button {
-                width: 100%;
-                justify-content: center;
-                padding: 0.875rem 1.5rem;
-            }
-            
-            .output-actions {
-                flex-direction: column;
-                gap: 0.75rem;
-            }
-        }
-        
-        .mobile-menu-toggle {
-            display: none;
-        }
-    </style>
+    html.bp-md-down .pagination>mdui-button {
+      flex: 1;
+    }
+  </style>
 </head>
 
 <body>
-    <nav class="navbar">
-        <div class="navbar-container">
-            <a href="/" class="logo">
-                <div class="logo-icon">
-                    ⚡
-                </div>
-                加速服务
-            </a>
-            
-            <button class="mobile-menu-toggle" id="mobileMenuToggle">
-                ☰
-            </button>
-            
-            <div class="nav-links" id="navLinks">
-                <a href="/" class="nav-link active">🚀 GitHub加速</a>
-                <a href="/images.html" class="nav-link">🐳 离线镜像下载</a>
-                <a href="/search.html" class="nav-link">🔍 镜像搜索</a>
-                <a href="https://gitee.com/if-the-wind/github-hosts/raw/main/hosts" target="_blank" class="nav-link">📄 Hosts</a>
-                
-                <button class="theme-toggle" id="themeToggle">
-                    🌙
-                </button>
+  <mdui-layout>
+    <!-- 侧边导航栏（PC用） -->
+    <mdui-navigation-rail id="mainNavRail" class="app-rail" placement="left" alignment="start" value="home" hidden>
+      <mdui-navigation-rail-item id="navHome" value="home" icon="home">首页</mdui-navigation-rail-item>
+      <mdui-navigation-rail-item id="navSearch" value="search" icon="search">搜索</mdui-navigation-rail-item>
+      <mdui-navigation-rail-item id="navImages" value="images" icon="archive"
+        slot="bottom">下载</mdui-navigation-rail-item>
+    </mdui-navigation-rail>
+    <!-- 底部导航栏（手机用） -->
+    <mdui-navigation-bar id="mainNavBar" class="app-bottom-bar" value="home" label-visibility="labeled">
+      <mdui-navigation-bar-item id="barHome" value="home" icon="home">首页</mdui-navigation-bar-item>
+      <mdui-navigation-bar-item id="barSearch" value="search" icon="search">搜索</mdui-navigation-bar-item>
+      <mdui-navigation-bar-item id="barImages" value="images" icon="archive">下载</mdui-navigation-bar-item>
+    </mdui-navigation-bar>
+
+    <!-- 顶部应用栏 -->
+    <mdui-top-app-bar variant="center-aligned">
+      <mdui-top-app-bar-title>
+        <span style="display: inline-flex; align-items: center; justify-content: center; width: 100%;">
+          <mdui-icon name="hub" style="margin-right: 8px;"></mdui-icon>
+          <span>狗子的 HubProxy</span>
+        </span>
+      </mdui-top-app-bar-title>
+      <mdui-button-icon id="themeButton" icon="dark_mode" aria-label="切换主题"
+        style="position: absolute; top: 50%; right: max(12px, env(safe-area-inset-right)); transform: translateY(-50%);"></mdui-button-icon>
+    </mdui-top-app-bar>
+
+    <!-- 内容区域 -->
+    <mdui-layout-main class="app-main">
+      <!-- 首页视图 -->
+      <section id="view-home" class="view active">
+        <mdui-card>
+          <div class="card-content">
+            <h2 style="margin: 0; font-size: 1.15rem;">GitHub 文件加速</h2>
+            <p class="desc mdui-prose">输入 GitHub 或支持域名链接，生成可直接访问的加速地址。</p>
+
+            <mdui-text-field id="githubLinkInput" label="原始链接"
+              placeholder="https://github.com/user/repo/releases/download/..." clearable>
+            </mdui-text-field>
+            <mdui-button id="formatButton" variant="filled" icon="bolt">生成加速链接</mdui-button>
+
+
+            <div id="outputBlock" class="output-wrap">
+              <mdui-alert icon="check_circle" variant="tonal">加速链接已生成</mdui-alert>
+              <p id="formattedLinkOutput" class="code-box"></p>
+              <div style="display: flex; flex-wrap: wrap; gap: 8px;">
+                <mdui-button id="copyButton" variant="text" icon="content_copy">复制链接</mdui-button>
+                <mdui-button id="openButton" variant="text" icon="open_in_new">打开链接</mdui-button>
+              </div>
             </div>
+          </div>
+        </mdui-card>
+
+        <mdui-card>
+          <div class="card-content">
+            <h2 style="margin: 0; font-size: 1.15rem;">Docker 镜像加速</h2>
+            <p class="desc mdui-prose">直接在镜像名前加上当前域名即可加速拉取：</p>
+            <div id="dockerExamples" class="mdui-prose">
+              <script>
+                const dockerExamples = document.getElementById('dockerExamples');
+                const domain = window.location.host;
+                const examples = [
+                  `docker pull ${domain}/nginx`,
+                  `docker pull ${domain}/user/image`,
+                  `docker pull ${domain}/ghcr.io/user/image`,
+                  `docker pull ${domain}/quay.io/org/image`,
+                  `docker pull ${domain}/registry.k8s.io/pause:3.8`
+                ];
+                dockerExamples.innerHTML = `<p class="code-box">${examples.join("<br />")}</p>` 
+              </script>
+            </div>
+          </div>
+        </mdui-card>
+      </section>
+
+      <!-- 搜索视图 -->
+      <section id="view-search" class="view">
+        <mdui-card>
+          <div class="card-content">
+            <h2 style="margin: 0; font-size: 1.2rem;">Docker Hub 镜像搜索</h2>
+            <p class="desc mdui-prose">输入仓库关键词，点击结果可查看标签与 <code>docker pull</code> 命令。</p>
+
+            <mdui-text-field id="searchInput" label="关键词" placeholder="例如：nginx 或 library/nginx" clearable>
+              <mdui-button-icon id="searchButton" slot="end-icon" icon="search"></mdui-button-icon>
+            </mdui-text-field>
+
+          </div>
+        </mdui-card>
+
+        <mdui-linear-progress id="loadingBar" class="hidden" indeterminate></mdui-linear-progress>
+
+        <div id="searchPanel">
+          <div class="card-content">
+            <div id="searchStatus" class="desc">请输入关键词并开始搜索</div>
+            <div id="resultGrid" class="result-grid"></div>
+
+            <div id="searchPagination" class="pagination hidden">
+              <mdui-button id="prevPageButton" variant="text" icon="navigate_before">上一页</mdui-button>
+              <span id="searchPageInfo" class="desc"></span>
+              <mdui-button id="nextPageButton" variant="text" icon="navigate_next" icon-trailing>下一页</mdui-button>
+            </div>
+          </div>
         </div>
-    </nav>
 
-    <main class="main">
-        <div class="container">
-            <div class="hero">
-                <h1 class="hero-title">GitHub 文件加速</h1>
-                <p class="hero-subtitle">
-                    快速下载GitHub上的文件和仓库，解决国内访问GitHub速度慢的问题，支持Docker镜像加速和Hugging Face仓库。
-                </p>
+        <mdui-card id="tagPanel" class="hidden">
+          <div class="card-content">
+            <mdui-button id="backToResults" variant="text" icon="arrow_back">返回搜索结果</mdui-button>
+            <div id="repoHeader" class="result-grid"></div>
+
+            <mdui-text-field id="tagFilterInput" label="标签筛选" placeholder="输入关键词过滤当前页标签" clearable></mdui-text-field>
+
+            <mdui-list id="tagGrid"></mdui-list>
+
+            <div id="tagPagination" class="pagination hidden">
+              <mdui-button id="tagPrevButton" variant="text" icon="navigate_before">上一页</mdui-button>
+              <span id="tagPageInfo" class="desc"></span>
+              <mdui-button id="tagNextButton" variant="text" icon="navigate_next" icon-trailing>下一页</mdui-button>
             </div>
+          </div>
+        </mdui-card>
+      </section>
 
-            <div class="card">
-                <div class="card-header">
-                    <h2 class="card-title">
-                        ⚡ 快速转换加速链接
-                    </h2>
-                    <p class="card-description">
-                        输入GitHub文件链接，自动转换加速链接，可以直接在Github文件链接前加上本站域名使用。
-                    </p>
-                </div>
-
-                <div class="form-group">
-                    <div class="input-container">
-                        <input 
-                            type="text" 
-                            class="input" 
-                            id="githubLinkInput" 
-                            placeholder="请输入GitHub文件链接，例如：https://github.com/user/repo/releases/download/..."
-                        >
-                        <button class="button button-primary" id="formatButton">
-                            获取加速链接
-                        </button>
-                    </div>
-                </div>
-
-                <div class="output-container" id="outputBlock">
-                    <div class="success-header">
-                        <span>✅</span>
-                        <strong>加速链接已生成</strong>
-                    </div>
-                    <div class="output-box" id="formattedLinkOutput"></div>
-                    <div class="output-actions">
-                        <button class="button button-secondary" id="copyButton">
-                            📋 复制链接
-                        </button>
-                        <button class="button button-secondary" id="redirButton">
-                            🔗 打开链接
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="card docker-info">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        🐳 Docker 镜像加速
-                    </h3>
-                    <p class="card-description">
-                        支持多种镜像仓库，在镜像名称前添加本站域名即可加速下载。
-                    </p>
-                </div>
-                
-                <button class="docker-button" id="dockerButton">
-                    查看 Docker 镜像加速使用说明
-                </button>
-            </div>
+      <!-- 下载视图 -->
+      <section id="view-images" class="view">
+        <div class="card-content">
+          <h2 style="margin: 0; font-size: 1.2rem;">Docker 离线镜像下载</h2>
+          <p class="desc mdui-prose">支持单镜像与批量镜像下载，产物可直接 <code>docker load</code>。</p>
         </div>
-    </main>
 
-    <div id="dockerModal" class="modal">
-        <div class="modal-content">
-            <button class="close-button" id="closeModal">&times;</button>
-            <div class="modal-header">
-                <h2 class="modal-title">Docker 镜像加速</h2>
-                <p>支持多种镜像仓库，在镜像名称前添加本站域名即可加速下载。</p>
-            </div>
-            
-            <div class="domain-examples">
-                <strong>Docker 官方镜像：</strong>
-                docker pull <span class="domain-base"></span>/nginx
+        <mdui-card>
+          <div class="card-content">
+            <h3 style="margin: 0; font-size: 1.08rem;">单镜像下载</h3>
+            <div id="singleStatus"></div>
 
-                <strong>Docker 镜像：</strong>
-                docker pull <span class="domain-base"></span>/user/image
+            <form id="singleForm" class="form-grid">
+              <mdui-text-field id="imageInput" label="镜像名称" placeholder="例如：nginx:alpine" clearable
+                required></mdui-text-field>
+              <mdui-text-field id="platformInput" label="目标架构（可选）" value="linux/amd64" placeholder="linux/amd64"
+                clearable></mdui-text-field>
 
-                <strong>ghcr.io 镜像：</strong>
-                docker pull <span class="domain-base"></span>/ghcr.io/user/image
+              <div class="switch-row">
+                <mdui-switch id="compressedToggle" checked></mdui-switch>
+                <div>
+                  <div class="switch-title">使用压缩层</div>
+                  <div class="switch-hint">减小包体积，适合网络较慢场景</div>
+                </div>
+              </div>
 
-                <strong>Quay.io 镜像：</strong>
-                docker pull <span class="domain-base"></span>/quay.io/org/image
+              <div class="inline-row">
+                <div class="desc">会先预检镜像可用性，再生成下载令牌。</div>
+                <mdui-button id="downloadButton" type="submit" variant="filled" icon="download">立即下载</mdui-button>
+              </div>
+            </form>
+          </div>
+        </mdui-card>
 
-                <strong>Kubernetes 镜像：</strong>
-                docker pull <span class="domain-base"></span>/registry.k8s.io/pause:3.8
-            </div>
+        <mdui-card>
+          <div class="card-content">
+            <h3 style="margin: 0; font-size: 1.08rem;">多个镜像批量下载</h3>
+            <div id="batchStatus"></div>
+
+            <form id="batchForm" class="form-grid">
+              <mdui-text-field id="imagesTextarea" label="镜像列表（每行一个）" rows="8" autosize clearable
+                placeholder="alpine&#10;redis:alpine&#10;stilleshan/frpc:0.62.1"></mdui-text-field>
+              <mdui-text-field id="batchPlatformInput" label="目标架构（可选）" value="linux/amd64" placeholder="linux/amd64"
+                clearable></mdui-text-field>
+
+              <div class="switch-row">
+                <mdui-switch id="batchCompressedToggle" checked></mdui-switch>
+                <div>
+                  <div class="switch-title">使用压缩层</div>
+                  <div class="switch-hint">减小总包体积，适合批量下载</div>
+                </div>
+              </div>
+
+              <div class="inline-row">
+                <div class="desc mdui-prose">注释行可使用 <code>#</code> 开头，系统会自动忽略。</div>
+                <mdui-button id="batchDownloadButton" type="submit" variant="filled" icon="archive">开始下载</mdui-button>
+              </div>
+            </form>
+          </div>
+        </mdui-card>
+      </section>
+    </mdui-layout-main>
+  </mdui-layout>
+
+  <script>
+    queueMicrotask(() => {
+      try {
+        if (typeof mdui !== 'undefined') {
+          // Ensure nav visibility is synced as early as possible.
+          applyBreakpointLayout();
+        }
+      } catch (error) {
+        // ignore
+      }
+    });
+
+
+    function applyBreakpointLayout() {
+      let isMdUp = false;
+      try {
+        const condition = mdui.breakpoint();
+        isMdUp = condition.up('md');
+      } catch (error) {
+        isMdUp = window.matchMedia('(min-width: 840px)').matches;
+      }
+      document.documentElement.classList.toggle('bp-md-up', isMdUp);
+      document.documentElement.classList.toggle('bp-md-down', !isMdUp);
+      navRail.hidden = !isMdUp;
+      navBar.hidden = isMdUp;
+    }
+
+    let breakpointRaf = 0;
+    function queueBreakpointLayoutSync() {
+      if (breakpointRaf) cancelAnimationFrame(breakpointRaf);
+      breakpointRaf = requestAnimationFrame(() => {
+        applyBreakpointLayout();
+        breakpointRaf = 0;
+      });
+    }
+
+
+    const views = {
+      home: document.getElementById('view-home'),
+      search: document.getElementById('view-search'),
+      images: document.getElementById('view-images'),
+    };
+
+    const navRail = document.getElementById('mainNavRail');
+    const navBar = document.getElementById('mainNavBar');
+    const navItems = {
+      home: [document.getElementById('navHome'), document.getElementById('barHome')],
+      search: [document.getElementById('navSearch'), document.getElementById('barSearch')],
+      images: [document.getElementById('navImages'), document.getElementById('barImages')],
+    };
+
+    const themeButton = document.getElementById('themeButton');
+
+    function setTheme(theme) {
+      mdui.setTheme(theme);
+      localStorage.setItem('theme', theme);
+      themeButton.icon = theme === 'dark' ? 'light_mode' : 'dark_mode';
+    }
+
+    function initTheme() {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark' || savedTheme === 'light') {
+        setTheme(savedTheme);
+        return;
+      }
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      setTheme(prefersDark ? 'dark' : 'light');
+    }
+
+    function showMessage(message) {
+      mdui.snackbar({ message, placement: 'top' });
+    }
+
+    function setActiveView(name) {
+      Object.entries(views).forEach(([key, el]) => {
+        el.classList.toggle('active', key === name);
+      });
+
+      navRail.value = name;
+      navBar.value = name;
+
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', name);
+      history.replaceState({}, '', url);
+    }
+
+
+    navItems.home.forEach((item) => item.addEventListener('click', () => setActiveView('home')));
+    navItems.search.forEach((item) => item.addEventListener('click', () => setActiveView('search')));
+    navItems.images.forEach((item) => item.addEventListener('click', () => setActiveView('images')));
+    navRail.addEventListener('change', () => {
+      const value = navRail.value;
+      const currentActive = Object.keys(views).find((key) => views[key].classList.contains('active'));
+      if (value && views[value] && value !== currentActive) setActiveView(value);
+    });
+    window.addEventListener('resize', queueBreakpointLayoutSync, { passive: true });
+    window.addEventListener('orientationchange', queueBreakpointLayoutSync, { passive: true });
+    navBar.addEventListener('change', () => {
+      const value = navBar.value;
+      const currentActive = Object.keys(views).find((key) => views[key].classList.contains('active'));
+      if (value && views[value] && value !== currentActive) setActiveView(value);
+    });
+
+    themeButton.addEventListener('click', () => {
+      const currentTheme = localStorage.getItem('theme') || 'light';
+      setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+    });
+
+    const githubLinkInput = document.getElementById('githubLinkInput');
+    const formatButton = document.getElementById('formatButton');
+    const outputBlock = document.getElementById('outputBlock');
+    const formattedLinkOutput = document.getElementById('formattedLinkOutput');
+    const copyButton = document.getElementById('copyButton');
+    const openButton = document.getElementById('openButton');
+
+    function buildProxyLink(rawLink) {
+      const host = window.location.host;
+      if (rawLink.startsWith('https://') || rawLink.startsWith('http://')) {
+        return `https://${host}/${rawLink}`;
+      }
+
+      const allowPrefixes = [
+        'github.com/',
+        'raw.githubusercontent.com/',
+        'gist.githubusercontent.com/',
+        'sourceforge.net/',
+        'huggingface.co/',
+        'cdn-lfs.hf.co/',
+        'download.docker.com/'
+      ];
+
+      if (allowPrefixes.some((prefix) => rawLink.startsWith(prefix))) {
+        return `https://${host}/https://${rawLink}`;
+      }
+
+      return '';
+    }
+
+    async function copyText(text) {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text);
+        return;
+      }
+      throw new Error('clipboard unsupported');
+    }
+
+
+    function submitFormat() {
+      const rawValue = (githubLinkInput.value || '').trim();
+      if (!rawValue) {
+        showMessage('请输入链接');
+        return;
+      }
+
+      const proxyLink = buildProxyLink(rawValue);
+      if (!proxyLink) {
+        showMessage('请输入有效的 GitHub 或支持域名链接');
+        return;
+      }
+
+      formattedLinkOutput.textContent = proxyLink;
+      outputBlock.classList.add('show');
+    }
+
+    formatButton.addEventListener('click', submitFormat);
+    githubLinkInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        submitFormat();
+      }
+    });
+
+    copyButton.addEventListener('click', async () => {
+      const text = formattedLinkOutput.textContent.trim();
+      if (!text) {
+        showMessage('暂无可复制内容');
+        return;
+      }
+
+      try {
+        await copyText(text);
+        showMessage('链接已复制到剪贴板');
+      } catch (error) {
+        showMessage('复制失败，请手动复制');
+      }
+    });
+
+    openButton.addEventListener('click', () => {
+      const text = formattedLinkOutput.textContent.trim();
+      if (!text) {
+        showMessage('暂无可打开链接');
+        return;
+      }
+      window.open(text, '_blank');
+    });
+
+    const searchInput = document.getElementById('searchInput');
+    const searchButton = document.getElementById('searchButton');
+    const loadingBar = document.getElementById('loadingBar');
+    const resultGrid = document.getElementById('resultGrid');
+    const tagGrid = document.getElementById('tagGrid');
+    const searchStatus = document.getElementById('searchStatus');
+    const searchPanel = document.getElementById('searchPanel');
+    const tagPanel = document.getElementById('tagPanel');
+    const backToResults = document.getElementById('backToResults');
+    const repoHeader = document.getElementById('repoHeader');
+
+    const searchPagination = document.getElementById('searchPagination');
+    const prevPageButton = document.getElementById('prevPageButton');
+    const nextPageButton = document.getElementById('nextPageButton');
+    const searchPageInfo = document.getElementById('searchPageInfo');
+
+    const tagPagination = document.getElementById('tagPagination');
+    const tagPrevButton = document.getElementById('tagPrevButton');
+    const tagNextButton = document.getElementById('tagNextButton');
+    const tagPageInfo = document.getElementById('tagPageInfo');
+
+    const tagFilterInput = document.getElementById('tagFilterInput');
+
+    let currentQuery = '';
+    let currentPage = 1;
+    let totalPages = 1;
+
+    let currentRepo = null;
+    let currentTagPage = 1;
+    let totalTagPages = 1;
+    let currentPageTags = [];
+
+    function setLoading(loading) {
+      loadingBar.classList.toggle('hidden', !loading);
+    }
+
+    function showSearchPanel() {
+      searchPanel.classList.remove('hidden');
+      tagPanel.classList.add('hidden');
+      searchStatus.textContent = `搜索关键字：${currentQuery}`;
+    }
+
+    function showTagPanel() {
+      searchPanel.classList.add('hidden');
+      tagPanel.classList.remove('hidden');
+      searchStatus.textContent = `仓库：${getDisplayRepoName(currentRepo)}`;
+    }
+
+    function formatNumber(num) {
+      if (num >= 1000000000) return `${(num / 1000000000).toFixed(1)}B+`;
+      if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M+`;
+      if (num >= 1000) return `${(num / 1000).toFixed(1)}K+`;
+      return `${num || 0}`;
+    }
+
+    function formatTimeAgo(value) {
+      if (!value) return '未知时间';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '未知时间';
+
+      const diff = Math.max(0, Date.now() - date.getTime());
+      const minute = 60 * 1000;
+      const hour = 60 * minute;
+      const day = 24 * hour;
+
+      if (diff < minute) return '刚刚';
+      if (diff < hour) return `${Math.floor(diff / minute)} 分钟前`;
+      if (diff < day) return `${Math.floor(diff / hour)} 小时前`;
+      if (diff < 30 * day) return `${Math.floor(diff / day)} 天前`;
+      if (diff < 365 * day) return `${Math.floor(diff / (30 * day))} 个月前`;
+      return `${Math.floor(diff / (365 * day))} 年前`;
+    }
+
+    function formatSize(bytes) {
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      let size = bytes || 0;
+      let index = 0;
+      while (size >= 1024 && index < units.length - 1) {
+        size /= 1024;
+        index += 1;
+      }
+      return `${size.toFixed(2)} ${units[index]}`;
+    }
+
+    function escapeHtml(value) {
+      return String(value || '').replace(/[&<>"']/g, (char) => (
+        { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]
+      ));
+    }
+
+    function parseRepositoryInfo(repo) {
+      if (!repo) return { namespace: '', name: '', fullName: '' };
+
+      const namespace = repo.namespace || (repo.is_official ? 'library' : '');
+      const rawName = (repo.name || repo.repo_name || '').replace(/^library\//, '');
+      const fullName = repo.is_official ? rawName : `${namespace}/${rawName}`;
+      return { namespace, name: rawName, fullName };
+    }
+
+    function getDisplayRepoName(repo) {
+      return parseRepositoryInfo(repo).fullName || '未知仓库';
+    }
+
+    function setSearchPagination() {
+      const show = totalPages > 1;
+      searchPagination.classList.toggle('hidden', !show);
+      prevPageButton.disabled = currentPage <= 1;
+      nextPageButton.disabled = currentPage >= totalPages;
+      searchPageInfo.textContent = `第 ${currentPage} / ${totalPages} 页`;
+    }
+
+    function setTagPagination() {
+      const show = totalTagPages > 1;
+      tagPagination.classList.toggle('hidden', !show);
+      tagPrevButton.disabled = currentTagPage <= 1;
+      tagNextButton.disabled = currentTagPage >= totalTagPages;
+      tagPageInfo.textContent = `第 ${currentTagPage} / ${totalTagPages} 页`;
+    }
+
+    function buildResultCard(repo) {
+      const displayName = getDisplayRepoName(repo);
+      const description = repo.short_description || '暂无描述';
+      const badges = [
+        repo.is_official ? '<span class="chip">官方</span>' : '',
+        repo.affiliation ? `<span class="chip">By ${repo.affiliation}</span>` : ''
+      ].filter(Boolean).join('');
+
+      const node = document.createElement('mdui-card');
+      node.innerHTML = `
+        <mdui-card clickable class="card-content">
+          <div class="title-row">
+            <span>${displayName}</span>
+            ${badges}
+          </div>
+          <p class="desc mdui-prose">${description}</p>
+          <div class="meta-row">
+            <span><mdui-icon name="star"></mdui-icon>${formatNumber(repo.star_count || 0)}</span>
+            <span><mdui-icon name="download"></mdui-icon>${formatNumber(repo.pull_count || 0)}</span>
+            <span><mdui-icon name="update"></mdui-icon>${formatTimeAgo(repo.last_updated)}</span>
+          </div>
+        </mdui-card>
+      `;
+
+      node.addEventListener('click', () => {
+        currentRepo = repo;
+        currentTagPage = 1;
+        totalTagPages = 1;
+        loadTagPage(true);
+      });
+
+      return node;
+    }
+
+    function renderSearchResults(list) {
+      resultGrid.innerHTML = '';
+      if (!list || list.length === 0) {
+        resultGrid.innerHTML = '<mdui-alert icon="info" variant="tonal">没有找到相关仓库</mdui-alert>';
+        return;
+      }
+      list.forEach((repo) => resultGrid.appendChild(buildResultCard(repo)));
+    }
+
+    function renderRepoHeader() {
+      if (!currentRepo) return;
+
+      const repoInfo = parseRepositoryInfo(currentRepo);
+      const pullCommand = `docker pull ${repoInfo.fullName}`;
+
+      repoHeader.innerHTML = `
+        <div class="title-row">${repoInfo.fullName}</div>
+        <p class="desc mdui-prose">${currentRepo.short_description || '暂无描述'}</p>
+        <p class="code-box">${pullCommand}</p>
+        <div>
+          <mdui-button id="copyRepoPullButton" variant="text" icon="content_copy">复制基础命令</mdui-button>
         </div>
-    </div>
+      `;
 
-    <div id="toast" class="toast">
-        链接已复制到剪贴板
-    </div>
-
-    <footer class="footer">
-        <a href="https://github.com/sky22333/hubproxy" target="_blank" class="github-link">
-            <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor">
-                <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
-            </svg>
-            GitHub
-        </a>
-    </footer>
-
-    <script>
-                 const themeToggle = document.getElementById('themeToggle');
-        const html = document.documentElement;
-                 
-         const savedTheme = localStorage.getItem('theme');
-        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-        
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-            html.classList.add('dark');
-            themeToggle.textContent = '☀️';
+      document.getElementById('copyRepoPullButton').addEventListener('click', async () => {
+        try {
+          await copyText(pullCommand);
+          showMessage('已复制到剪贴板');
+        } catch (error) {
+          showMessage('复制失败');
         }
-        
-        themeToggle.addEventListener('click', () => {
-            html.classList.toggle('dark');
-            const isDark = html.classList.contains('dark');
-            themeToggle.textContent = isDark ? '☀️' : '🌙';
-            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+      });
+    }
+
+    function renderTagList(tags) {
+      tagGrid.innerHTML = '';
+      if (!tags || tags.length === 0) {
+        tagGrid.innerHTML = '<mdui-alert icon="info" variant="tonal">当前页没有匹配标签</mdui-alert>';
+        return;
+      }
+
+      const repoFullName = parseRepositoryInfo(currentRepo).fullName;
+      const collapse = document.createElement('mdui-collapse');
+      collapse.accordion = true;
+
+      tags.forEach((tag, index) => {
+        const tagName = tag.name || 'unknown';
+        const cmd = `docker pull ${repoFullName}:${tagName}`;
+        const safeTagName = escapeHtml(tagName);
+        const meta = `${formatTimeAgo(tag.last_updated)} · ${tag.full_size ? formatSize(tag.full_size) : '未知大小'}`;
+        const safeMeta = escapeHtml(meta);
+        const safeCmd = escapeHtml(cmd);
+
+        const node = document.createElement('mdui-collapse-item');
+        node.value = `tag-${index}`;
+        node.innerHTML = `
+          <mdui-list-item slot="header" icon="sell" end-icon="keyboard_arrow_down" rounded>
+            ${safeTagName}
+            <span slot="description">${safeMeta}</span>
+          </mdui-list-item>
+          <div class="tag-collapse-body">
+            <p class="code-box tag-command-box">${safeCmd}</p>
+            <div>
+              <mdui-button class="copy-tag-command" variant="text" icon="content_copy">复制命令</mdui-button>
+            </div>
+          </div>
+        `;
+
+        node.querySelector('.copy-tag-command').addEventListener('click', async () => {
+          try {
+            await copyText(cmd);
+            showMessage('已复制到剪贴板');
+          } catch (error) {
+            showMessage('复制失败');
+          }
         });
 
-                 document.addEventListener('DOMContentLoaded', function() {
-            const fullDomain = window.location.host;
-            document.querySelectorAll('.domain-base').forEach(span => {
-                span.textContent = fullDomain;
-            });
+        collapse.appendChild(node);
+      });
 
-                         const modal = document.getElementById('dockerModal');
-            const dockerButton = document.getElementById('dockerButton');
-            const closeButton = document.getElementById('closeModal');
+      tagGrid.appendChild(collapse);
+    }
 
-            dockerButton.onclick = () => modal.style.display = "flex";
-            closeButton.onclick = () => modal.style.display = "none";
-            window.onclick = (event) => {
-                if (event.target == modal) modal.style.display = "none";
-            };
-        });
+    function applyTagFilter() {
+      const keyword = (tagFilterInput.value || '').trim().toLowerCase();
+      if (!keyword) {
+        renderTagList(currentPageTags);
+        return;
+      }
+      const filtered = currentPageTags.filter((tag) => (tag.name || '').toLowerCase().includes(keyword));
+      renderTagList(filtered);
+    }
 
-                 function formatGithubLink() {
-            const githubLinkInput = document.getElementById('githubLinkInput');
-            const currentHost = window.location.host;
-            let formattedLink = "";
-            const link = githubLinkInput.value.trim();
-        
-            if (link.startsWith("https://") || link.startsWith("http://")) {
-                formattedLink = "https://" + currentHost + "/" + link;
-            } else if (
-                link.startsWith("github.com/") || 
-                link.startsWith("raw.githubusercontent.com/") || 
-                link.startsWith("gist.githubusercontent.com/") ||
-                link.startsWith("huggingface.co/") ||
-                link.startsWith("cdn-lfs.hf.co/") ||
-                link.startsWith("download.docker.com/")
-            ) {
-                formattedLink = "https://" + currentHost + "/https://" + link;
-            } else {
-                showToast('请输入有效的链接');
-                return;
-            }
-        
-            const formattedLinkOutput = document.getElementById('formattedLinkOutput');
-            formattedLinkOutput.textContent = formattedLink;
-            
-            const outputBlock = document.getElementById('outputBlock');
-            outputBlock.classList.add('show');
+    async function performSearch() {
+      const query = (searchInput.value || '').trim();
+      if (!query) {
+        showMessage('请输入搜索关键词');
+        return;
+      }
+
+      currentQuery = query;
+      setLoading(true);
+
+      try {
+        const response = await fetch(`/search?q=${encodeURIComponent(query)}&page=${currentPage}&page_size=25`);
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || '搜索失败');
+
+        totalPages = Math.max(1, Math.min(Math.ceil((data.count || 0) / 25), 100));
+        setSearchPagination();
+        renderSearchResults(data.results || []);
+        showSearchPanel();
+      } catch (error) {
+        showMessage(error.message || '搜索失败');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    async function loadTagPage(showPanelAfterLoad = false) {
+      if (!currentRepo) {
+        showMessage('未选择仓库');
+        return;
+      }
+
+      const { namespace, name } = parseRepositoryInfo(currentRepo);
+      if (!namespace || !name) {
+        showMessage('仓库信息不完整');
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const response = await fetch(`/tags/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}?page=${currentTagPage}&page_size=100`);
+        const data = await response.json();
+
+        if (!response.ok) throw new Error(data.error || '获取标签失败');
+
+        currentPageTags = Array.isArray(data.tags) ? data.tags : [];
+
+        if (data.has_more) {
+          totalTagPages = Math.max(totalTagPages, currentTagPage + 1);
+        } else {
+          totalTagPages = Math.max(1, currentTagPage);
         }
 
-                 function copyToClipboard() {
-            const output = document.getElementById('formattedLinkOutput');
-            const text = output.textContent;
-            
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast('链接已复制到剪贴板');
-                });
-                         } else {
-                 const range = document.createRange();
-                range.selectNode(output);
-                window.getSelection().removeAllRanges();
-                window.getSelection().addRange(range);
-                document.execCommand('copy');
-                window.getSelection().removeAllRanges();
-                showToast('链接已复制到剪贴板');
-            }
-        }
+        renderRepoHeader();
+        applyTagFilter();
+        setTagPagination();
 
-                 function openLink() {
-            const formattedLinkOutput = document.getElementById('formattedLinkOutput');
-            window.open(formattedLinkOutput.textContent);
-        }
+        if (showPanelAfterLoad) showTagPanel();
+      } catch (error) {
+        showMessage(error.message || '获取标签失败');
+      } finally {
+        setLoading(false);
+      }
+    }
 
-                 function showToast(message) {
-            const toast = document.getElementById('toast');
-            toast.textContent = message;
-            toast.classList.add('show');
+    searchButton.addEventListener('click', () => {
+      currentPage = 1;
+      performSearch();
+    });
 
-            setTimeout(() => {
-                toast.classList.remove('show');
-            }, 3000);
-        }
+    searchInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        currentPage = 1;
+        performSearch();
+      }
+    });
 
-                 document.getElementById('formatButton').addEventListener('click', formatGithubLink);
-        document.getElementById('copyButton').addEventListener('click', copyToClipboard);
-        document.getElementById('redirButton').addEventListener('click', openLink);
-        
-                 document.getElementById('githubLinkInput').addEventListener('keyup', function(event) {
-            if (event.key === 'Enter') {
-                formatGithubLink();
-            }
+    prevPageButton.addEventListener('click', () => {
+      if (currentPage <= 1) return;
+      currentPage -= 1;
+      performSearch();
+    });
+
+    nextPageButton.addEventListener('click', () => {
+      if (currentPage >= totalPages) return;
+      currentPage += 1;
+      performSearch();
+    });
+
+    backToResults.addEventListener('click', showSearchPanel);
+
+    tagPrevButton.addEventListener('click', () => {
+      if (currentTagPage <= 1) return;
+      currentTagPage -= 1;
+      loadTagPage(true);
+    });
+
+    tagNextButton.addEventListener('click', () => {
+      if (currentTagPage >= totalTagPages) return;
+      currentTagPage += 1;
+      loadTagPage(true);
+    });
+
+    tagFilterInput.addEventListener('input', applyTagFilter);
+
+
+    const singleForm = document.getElementById('singleForm');
+    const imageInput = document.getElementById('imageInput');
+    const platformInput = document.getElementById('platformInput');
+    const compressedToggle = document.getElementById('compressedToggle');
+    const singleStatus = document.getElementById('singleStatus');
+    const downloadButton = document.getElementById('downloadButton');
+
+    const batchForm = document.getElementById('batchForm');
+    const imagesTextarea = document.getElementById('imagesTextarea');
+    const batchPlatformInput = document.getElementById('batchPlatformInput');
+    const batchCompressedToggle = document.getElementById('batchCompressedToggle');
+    const batchStatus = document.getElementById('batchStatus');
+    const batchDownloadButton = document.getElementById('batchDownloadButton');
+
+    function renderStatus(target, message, type = 'info') {
+      let icon = 'info';
+      let variant = 'filled';
+      if (type === 'success') {
+        icon = 'check_circle';
+        variant = 'tonal';
+      } else if (type === 'error') {
+        icon = 'error';
+        variant = 'filled';
+      } else if (type === 'warning') {
+        icon = 'warning';
+        variant = 'outlined';
+      }
+      target.innerHTML = `<mdui-alert icon="${icon}" variant="${variant}">${message}</mdui-alert>`;
+    }
+
+    function clearStatus(target) {
+      target.innerHTML = '';
+    }
+
+    function setButtonLoading(button, loading) {
+      button.loading = loading;
+      button.disabled = loading;
+    }
+
+    function buildDownloadUrl(imageName, platform = '', useCompressed = true, mode = '') {
+      const encodedImage = imageName.replace(/\//g, '_');
+      let url = `/api/image/download/${encodedImage}`;
+
+      const params = new URLSearchParams();
+      if (platform && platform.trim()) params.append('platform', platform.trim());
+      params.append('compressed', String(useCompressed));
+      if (mode) params.append('mode', mode);
+
+      const query = params.toString();
+      if (query) url = `${url}?${query}`;
+      return url;
+    }
+
+    function buildInfoUrl(imageName) {
+      const encodedImage = imageName.replace(/\//g, '_');
+      return `/api/image/info/${encodedImage}`;
+    }
+
+    function triggerDownload(downloadUrl) {
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = '';
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    async function preflightImageDownload(imageName) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      try {
+        const response = await fetch(buildInfoUrl(imageName), {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+          signal: controller.signal,
         });
 
-        const mobileMenuToggle = document.getElementById('mobileMenuToggle');
-        const navLinks = document.getElementById('navLinks');
-        
-        mobileMenuToggle.addEventListener('click', () => {
-            navLinks.classList.toggle('active');
-            mobileMenuToggle.textContent = navLinks.classList.contains('active') ? '✕' : '☰';
-        });
-        
-        document.addEventListener('click', (e) => {
-            if (!e.target.closest('.navbar') && navLinks.classList.contains('active')) {
-                navLinks.classList.remove('active');
-                mobileMenuToggle.textContent = '☰';
-            }
-        });
-    </script>
+        const contentType = response.headers.get('Content-Type') || '';
+        let payload = null;
+        if (contentType.includes('application/json')) payload = await response.json();
+
+        if (!response.ok) {
+          return { ok: false, error: (payload && payload.error) ? payload.error : '镜像预检失败' };
+        }
+
+        if (payload && payload.success === false) {
+          return { ok: false, error: payload.error || '镜像预检失败' };
+        }
+
+        return { ok: true };
+      } catch (error) {
+        if (error.name === 'AbortError') return { ok: false, error: '预检超时，请稍后重试' };
+        return { ok: false, error: `网络错误: ${error.message}` };
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    async function preflightImages(images) {
+      const uniqueImages = Array.from(new Set(images));
+      const results = await Promise.allSettled(uniqueImages.map((name) => preflightImageDownload(name)));
+      for (const result of results) {
+        if (result.status === 'rejected') return { ok: false, error: '预检失败，请稍后重试' };
+        if (!result.value.ok) return { ok: false, error: result.value.error || '预检失败' };
+      }
+      return { ok: true };
+    }
+
+    async function prepareSingleDownload(imageName, platform, useCompressed) {
+      const response = await fetch(buildDownloadUrl(imageName, platform, useCompressed, 'prepare'), {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '下载失败');
+      if (!data.download_url) throw new Error('下载地址生成失败');
+      return data.download_url;
+    }
+
+    async function prepareBatchDownload(payload) {
+      const response = await fetch('/api/image/batch?mode=prepare', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '下载失败');
+      if (!data.download_url) throw new Error('下载地址生成失败');
+      return data.download_url;
+    }
+
+    singleForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const imageName = (imageInput.value || '').trim();
+      const platform = (platformInput.value || '').trim();
+      const useCompressed = Boolean(compressedToggle.checked);
+
+      if (!imageName) {
+        renderStatus(singleStatus, '请输入镜像名称', 'error');
+        return;
+      }
+
+      clearStatus(singleStatus);
+      setButtonLoading(downloadButton, true);
+
+      try {
+        renderStatus(singleStatus, '正在进行镜像预检，请稍候...', 'info');
+        const preflightResult = await preflightImages([imageName]);
+        if (!preflightResult.ok) throw new Error(preflightResult.error || '预检失败');
+
+        renderStatus(singleStatus, '正在生成下载令牌...', 'info');
+        const downloadUrl = await prepareSingleDownload(imageName, platform, useCompressed);
+        triggerDownload(downloadUrl);
+
+        const platformText = platform ? ` (${platform})` : '';
+        renderStatus(singleStatus, `开始下载 ${imageName}${platformText}`, 'success');
+      } catch (error) {
+        renderStatus(singleStatus, error.message || '下载失败', 'error');
+      } finally {
+        setButtonLoading(downloadButton, false);
+      }
+    });
+
+    batchForm.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const rawText = (imagesTextarea.value || '').trim();
+      const platform = (batchPlatformInput.value || '').trim();
+      const useCompressed = Boolean(batchCompressedToggle.checked);
+
+      if (!rawText) {
+        renderStatus(batchStatus, '请输入镜像列表', 'error');
+        return;
+      }
+
+      const images = rawText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line && !line.startsWith('#'));
+
+      if (images.length === 0) {
+        renderStatus(batchStatus, '镜像列表为空', 'error');
+        return;
+      }
+
+      const payload = { images, useCompressedLayers: useCompressed };
+      if (platform) payload.platform = platform;
+
+      clearStatus(batchStatus);
+      setButtonLoading(batchDownloadButton, true);
+
+      try {
+        renderStatus(batchStatus, `正在预检 ${images.length} 个镜像...`, 'info');
+        const preflightResult = await preflightImages(images);
+        if (!preflightResult.ok) throw new Error(preflightResult.error || '预检失败');
+
+        renderStatus(batchStatus, '正在生成批量下载令牌...', 'info');
+        const downloadUrl = await prepareBatchDownload(payload);
+        triggerDownload(downloadUrl);
+
+        const platformText = platform ? ` (${platform})` : '';
+        renderStatus(batchStatus, `开始下载 ${images.length} 个镜像${platformText}`, 'success');
+      } catch (error) {
+        renderStatus(batchStatus, error.message || '下载失败', 'error');
+      } finally {
+        setButtonLoading(batchDownloadButton, false);
+      }
+    });
+
+    function initFromQuery() {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab && views[tab]) setActiveView(tab);
+
+      const searchQuery = params.get('q');
+      if (searchQuery) {
+        searchInput.value = searchQuery;
+        setActiveView('search');
+        currentPage = 1;
+        performSearch();
+      }
+    }
+
+    initTheme();
+    applyBreakpointLayout();
+    initFromQuery();
+  </script>
 </body>
 
 </html>

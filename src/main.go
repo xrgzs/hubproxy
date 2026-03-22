@@ -8,12 +8,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gin-gonic/gin"
-	"golang.org/x/net/http2"
-	"golang.org/x/net/http2/h2c"
 	"hubproxy/config"
 	"hubproxy/handlers"
 	"hubproxy/utils"
+
+	"github.com/gin-gonic/gin"
+	"golang.org/x/net/http2"
+	"golang.org/x/net/http2/h2c"
 )
 
 //go:embed public/*
@@ -72,13 +73,6 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 			filepath := strings.TrimPrefix(c.Param("filepath"), "/")
 			serveEmbedFile(c, "public/"+filepath)
 		})
-
-		router.GET("/images.html", func(c *gin.Context) {
-			serveEmbedFile(c, "public/images.html")
-		})
-		router.GET("/search.html", func(c *gin.Context) {
-			serveEmbedFile(c, "public/search.html")
-		})
 		router.GET("/favicon.ico", func(c *gin.Context) {
 			serveEmbedFile(c, "public/favicon.ico")
 		})
@@ -89,16 +83,13 @@ func buildRouter(cfg *config.AppConfig) *gin.Engine {
 		router.GET("/public/*filepath", func(c *gin.Context) {
 			c.Status(http.StatusNotFound)
 		})
-		router.GET("/images.html", func(c *gin.Context) {
-			c.Status(http.StatusNotFound)
-		})
-		router.GET("/search.html", func(c *gin.Context) {
-			c.Status(http.StatusNotFound)
-		})
 		router.GET("/favicon.ico", func(c *gin.Context) {
 			c.Status(http.StatusNotFound)
 		})
 	}
+	router.GET("/robots.txt", func(c *gin.Context) {
+		c.String(http.StatusOK, "User-agent: *\nDisallow: /")
+	})
 
 	// 注册dockerhub搜索路由
 	handlers.RegisterSearchRoute(router)
