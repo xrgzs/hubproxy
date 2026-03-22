@@ -78,6 +78,33 @@
       line-height: 1.6;
     }
 
+    .code-box-wrap {
+      position: relative;
+    }
+
+    .code-box-wrap .code-box {
+      margin: 0;
+      padding-right: 44px;
+    }
+
+    .code-box-copy-btn {
+      position: absolute;
+      top: 6px;
+      right: 6px;
+      width: 28px;
+      height: 28px;
+      font-size: 16px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .15s ease;
+    }
+
+    .code-box-wrap:hover .code-box-copy-btn,
+    .code-box-wrap:focus-within .code-box-copy-btn {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     .result-grid {
       display: grid;
       gap: 10px;
@@ -240,7 +267,6 @@
               <mdui-alert icon="check_circle" variant="tonal">加速链接已生成</mdui-alert>
               <p id="formattedLinkOutput" class="code-box"></p>
               <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                <mdui-button id="copyButton" variant="text" icon="content_copy">复制链接</mdui-button>
                 <mdui-button id="openButton" variant="text" icon="open_in_new">打开链接</mdui-button>
               </div>
             </div>
@@ -526,7 +552,6 @@
     const formatButton = document.getElementById('formatButton');
     const outputBlock = document.getElementById('outputBlock');
     const formattedLinkOutput = document.getElementById('formattedLinkOutput');
-    const copyButton = document.getElementById('copyButton');
     const openButton = document.getElementById('openButton');
     const refreshReadyButton = document.getElementById('refreshReadyButton');
     const readyStatus = document.getElementById('readyStatus');
@@ -593,21 +618,6 @@
       }
     });
 
-    copyButton.addEventListener('click', async () => {
-      const text = formattedLinkOutput.textContent.trim();
-      if (!text) {
-        showMessage('暂无可复制内容');
-        return;
-      }
-
-      try {
-        await copyText(text);
-        showMessage('链接已复制到剪贴板');
-      } catch (error) {
-        showMessage('复制失败，请手动复制');
-      }
-    });
-
     openButton.addEventListener('click', () => {
       const text = formattedLinkOutput.textContent.trim();
       if (!text) {
@@ -622,6 +632,38 @@
       const date = new Date(value);
       if (Number.isNaN(date.getTime())) return '-';
       return date.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    function enhanceCodeBoxes(root = document) {
+      const boxes = root.querySelectorAll('.code-box');
+      boxes.forEach((box) => {
+        if (box.dataset.copyEnhanced === '1') return;
+        box.dataset.copyEnhanced = '1';
+
+        const wrap = document.createElement('div');
+        wrap.className = 'code-box-wrap';
+        box.parentNode.insertBefore(wrap, box);
+        wrap.appendChild(box);
+
+        const copyIconButton = document.createElement('mdui-button-icon');
+        copyIconButton.className = 'code-box-copy-btn';
+        copyIconButton.icon = 'content_copy';
+        copyIconButton.setAttribute('aria-label', '复制内容');
+        copyIconButton.addEventListener('click', async () => {
+          const text = (box.textContent || '').trim();
+          if (!text) {
+            showMessage('暂无可复制内容');
+            return;
+          }
+          try {
+            await copyText(text);
+            showMessage('已复制到剪贴板');
+          } catch (error) {
+            showMessage('复制失败，请手动复制');
+          }
+        });
+        wrap.appendChild(copyIconButton);
+      });
     }
 
     async function loadReadyStatus() {
@@ -827,25 +869,14 @@
       if (!currentRepo) return;
 
       const repoInfo = parseRepositoryInfo(currentRepo);
-      const pullCommand = `docker pull ${repoInfo.fullName}`;
+      const pullCommand = `docker pull ${window.location.host}/${repoInfo.fullName}`;
 
       repoHeader.innerHTML = `
         <div class="title-row">${repoInfo.fullName}</div>
         <p class="desc mdui-prose">${currentRepo.short_description || '暂无描述'}</p>
         <p class="code-box">${pullCommand}</p>
-        <div>
-          <mdui-button id="copyRepoPullButton" variant="text" icon="content_copy">复制基础命令</mdui-button>
-        </div>
       `;
-
-      document.getElementById('copyRepoPullButton').addEventListener('click', async () => {
-        try {
-          await copyText(pullCommand);
-          showMessage('已复制到剪贴板');
-        } catch (error) {
-          showMessage('复制失败');
-        }
-      });
+      enhanceCodeBoxes(repoHeader);
     }
 
     function renderTagList(tags) {
@@ -861,7 +892,7 @@
 
       tags.forEach((tag, index) => {
         const tagName = tag.name || 'unknown';
-        const cmd = `docker pull ${repoFullName}:${tagName}`;
+        const cmd = `docker pull ${window.location.host}/${repoFullName}:${tagName}`;
         const safeTagName = escapeHtml(tagName);
         const meta = `${formatTimeAgo(tag.last_updated)} · ${tag.full_size ? formatSize(tag.full_size) : '未知大小'}`;
         const safeMeta = escapeHtml(meta);
@@ -876,25 +907,14 @@
           </mdui-list-item>
           <div class="tag-collapse-body">
             <p class="code-box tag-command-box">${safeCmd}</p>
-            <div>
-              <mdui-button class="copy-tag-command" variant="text" icon="content_copy">复制命令</mdui-button>
-            </div>
           </div>
         `;
-
-        node.querySelector('.copy-tag-command').addEventListener('click', async () => {
-          try {
-            await copyText(cmd);
-            showMessage('已复制到剪贴板');
-          } catch (error) {
-            showMessage('复制失败');
-          }
-        });
 
         collapse.appendChild(node);
       });
 
       tagGrid.appendChild(collapse);
+      enhanceCodeBoxes(tagGrid);
     }
 
     function applyTagFilter() {
@@ -1247,6 +1267,7 @@
     initTheme();
     applyBreakpointLayout();
     initFromQuery();
+    enhanceCodeBoxes(document);
     loadReadyStatus();
     setInterval(loadReadyStatus, 30000);
   </script>
