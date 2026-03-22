@@ -267,6 +267,40 @@
             </div>
           </div>
         </mdui-card>
+
+        <mdui-card>
+          <div class="card-content">
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+              <h2 style="margin: 0; font-size: 1.15rem;">服务状态</h2>
+              <mdui-button-icon id="refreshReadyButton" icon="refresh" aria-label="刷新状态"></mdui-button-icon>
+            </div>
+            <p class="desc mdui-prose">这里展示服务当前是否可用、已运行时长和最近刷新时间。</p>
+            <div id="readyStatus"></div>
+
+            <mdui-list>
+              <mdui-list-item icon="health_and_safety">
+                当前状态
+                <span id="readyStateText" slot="description">加载中...</span>
+              </mdui-list-item>
+              <mdui-list-item icon="schedule">
+                已运行时长
+                <span id="readyUptimeText" slot="description">-</span>
+              </mdui-list-item>
+              <mdui-list-item icon="tag">
+                当前版本
+                <span id="readyVersionText" slot="description">-</span>
+              </mdui-list-item>
+              <mdui-list-item icon="event">
+                启动时间
+                <span id="readyStartText" slot="description">-</span>
+              </mdui-list-item>
+              <mdui-list-item icon="update">
+                最后刷新
+                <span id="readyUpdatedText" slot="description">-</span>
+              </mdui-list-item>
+            </mdui-list>
+          </div>
+        </mdui-card>
       </section>
 
       <!-- 搜索视图 -->
@@ -494,6 +528,13 @@
     const formattedLinkOutput = document.getElementById('formattedLinkOutput');
     const copyButton = document.getElementById('copyButton');
     const openButton = document.getElementById('openButton');
+    const refreshReadyButton = document.getElementById('refreshReadyButton');
+    const readyStatus = document.getElementById('readyStatus');
+    const readyStateText = document.getElementById('readyStateText');
+    const readyUptimeText = document.getElementById('readyUptimeText');
+    const readyVersionText = document.getElementById('readyVersionText');
+    const readyStartText = document.getElementById('readyStartText');
+    const readyUpdatedText = document.getElementById('readyUpdatedText');
 
     function buildProxyLink(rawLink) {
       const host = window.location.host;
@@ -575,6 +616,50 @@
       }
       window.open(text, '_blank');
     });
+
+    function formatDateTime(value) {
+      if (!value) return '-';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '-';
+      return date.toLocaleString('zh-CN', { hour12: false });
+    }
+
+    async function loadReadyStatus() {
+      setButtonLoading(refreshReadyButton, true);
+
+      try {
+        const response = await fetch('/ready', {
+          method: 'GET',
+          headers: { Accept: 'application/json' },
+          cache: 'no-store',
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || '监控接口请求失败');
+
+        const service = escapeHtml(data.service || 'hubproxy');
+        const version = escapeHtml(data.version || 'unknown');
+        const uptime = escapeHtml(data.uptime_human || '-');
+        const readyText = data.ready ? '服务就绪' : '服务未就绪';
+        const startUnix = Number(data.start_time_unix || 0);
+        const startDisplay = startUnix > 0 ? formatDateTime(startUnix * 1000) : '-';
+        const updatedDisplay = formatDateTime(Date.now());
+
+        renderStatus(readyStatus, `${readyText}，当前可正常使用。`, data.ready ? 'success' : 'warning');
+        readyStateText.textContent = data.ready ? '正常运行' : '暂不可用';
+        readyUptimeText.textContent = uptime;
+        readyVersionText.textContent = `${service} ${version}`;
+        readyStartText.textContent = startDisplay;
+        readyUpdatedText.textContent = updatedDisplay;
+      } catch (error) {
+        renderStatus(readyStatus, error.message || '监控接口请求失败', 'error');
+        readyStateText.textContent = '获取失败';
+        readyUpdatedText.textContent = formatDateTime(Date.now());
+      } finally {
+        setButtonLoading(refreshReadyButton, false);
+      }
+    }
+
+    refreshReadyButton.addEventListener('click', loadReadyStatus);
 
     const searchInput = document.getElementById('searchInput');
     const searchButton = document.getElementById('searchButton');
@@ -1162,6 +1247,8 @@
     initTheme();
     applyBreakpointLayout();
     initFromQuery();
+    loadReadyStatus();
+    setInterval(loadReadyStatus, 30000);
   </script>
 </body>
 
