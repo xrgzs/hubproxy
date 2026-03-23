@@ -904,22 +904,74 @@
       collapse.accordion = true;
 
       tags.forEach((tag, index) => {
+
+        // {
+        //     "name": "alpine-arm64",
+        //     "full_size": 63154406,
+        //     "last_updated": "2026-03-22T18:30:19.742421Z",
+        //     "last_pusher": "",
+        //     "images": [
+        //         {
+        //             "architecture": "arm64",
+        //             "features": "",
+        //             "digest": "sha256:2eaf2e16b60df11b865e7c6aa81f45399e0c20cf7ba17646a5a705e62fc2d5aa",
+        //             "os": "linux",
+        //             "os_features": "",
+        //             "size": 63154406
+        //         },
+        //         {
+        //             "architecture": "unknown",
+        //             "features": "",
+        //             "digest": "sha256:7dad9777808ee27b1cd831512c4f8b7ef177518a7c8fbd30de6b7d1f92afdde4",
+        //             "os": "unknown",
+        //             "os_features": "",
+        //             "size": 42900
+        //         }
+        //     ],
+        //     "vulnerabilities": {
+        //         "critical": 0,
+        //         "high": 0,
+        //         "medium": 0,
+        //         "low": 0,
+        //         "unknown": 0
+        //     }
+        // }
+
+
         const tagName = tag.name || 'unknown';
         const cmd = `docker pull ${window.location.host}/${repoFullName}:${tagName}`;
-        const safeTagName = escapeHtml(tagName);
-        const meta = `${formatTimeAgo(tag.last_updated)} · ${tag.full_size ? formatSize(tag.full_size) : '未知大小'}`;
-        const safeMeta = escapeHtml(meta);
-        const safeCmd = escapeHtml(cmd);
+        const updatedText = formatTimeAgo(tag.last_updated);
+        const sizeText = tag.full_size ? formatSize(tag.full_size) : '未知大小';
+        const archList = Array.from(new Set(
+          (Array.isArray(tag.images) ? tag.images : [])
+            .map((image) => image && image.architecture)
+            .filter((architecture) => architecture && architecture !== 'unknown')
+        ));
+        const archText = archList.length > 0 ? archList.join(' / ') : '未知架构';
+        const images = Array.isArray(tag.images) ? tag.images : [];
+        const imageItemsHtml = images.length > 0
+          ? `<mdui-list>${images.map((image) => {
+              const osText = image && image.os ? image.os : 'unknown';
+              const archValue = image && image.architecture ? image.architecture : 'unknown';
+              const imageSize = formatSize(Number((image && image.size) || 0));
+              const digest = image && image.digest ? image.digest : '';
+              return `<mdui-list-item icon="memory" rounded>
+                ${escapeHtml(osText + '/' + archValue)} · ${escapeHtml(imageSize)}
+                <span slot="description">${escapeHtml(digest)}</span>
+              </mdui-list-item>`;
+            }).join('')}</mdui-list>`
+          : '<mdui-alert icon="info" variant="tonal">该标签暂无镜像分层信息</mdui-alert>';
 
         const node = document.createElement('mdui-collapse-item');
         node.value = `tag-${index}`;
         node.innerHTML = `
           <mdui-list-item slot="header" icon="sell" end-icon="keyboard_arrow_down" rounded>
-            ${safeTagName}
-            <span slot="description">${safeMeta}</span>
+            ${escapeHtml(tagName)}
+            <span slot="description">${escapeHtml(updatedText)} · ${escapeHtml(sizeText)} · ${escapeHtml(archText)}</span>
           </mdui-list-item>
           <div class="tag-collapse-body">
-            <p class="code-box tag-command-box">${safeCmd}</p>
+            <p class="code-box tag-command-box">${escapeHtml(cmd)}</p>
+            ${imageItemsHtml}
           </div>
         `;
 
