@@ -1310,7 +1310,9 @@
       loadTagPage(true);
     });
 
-    tagFilterInput.addEventListener('input', applyTagFilter);
+    tagFilterInput.addEventListener('input', mdui.throttle(() => {
+      applyTagFilter();
+    }, 300));
 
 
     const singleForm = document.getElementById('singleForm');
