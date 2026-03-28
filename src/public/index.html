@@ -291,26 +291,16 @@
     .app-bottom-bar[hidden] {
       display: none !important;
     }
-
-    html.bp-md-down .feature-grid {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    html.bp-md-down .inline-row {
-      grid-template-columns: 1fr;
-    }
-
-    html.bp-md-down .tag-collapse-body {
-      margin-left: 0;
-    }
-
-    html.bp-md-down .pagination>mdui-button {
-      flex: 1;
-    }
   </style>
 </head>
 
 <body>
+  <!-- 底部导航栏（手机用） -->
+  <mdui-navigation-bar id="mainNavBar" class="app-bottom-bar" value="home" label-visibility="labeled">
+    <mdui-navigation-bar-item id="barHome" value="home" icon="home">首页</mdui-navigation-bar-item>
+    <mdui-navigation-bar-item id="barSearch" value="search" icon="search">搜索</mdui-navigation-bar-item>
+    <mdui-navigation-bar-item id="barImages" value="images" icon="archive">下载</mdui-navigation-bar-item>
+  </mdui-navigation-bar>
   <mdui-layout>
     <!-- 侧边导航栏（PC用） -->
     <mdui-navigation-rail id="mainNavRail" class="app-rail" placement="left" alignment="start" value="home" hidden>
@@ -319,12 +309,7 @@
       <mdui-navigation-rail-item id="navImages" value="images" icon="archive"
         slot="bottom">下载</mdui-navigation-rail-item>
     </mdui-navigation-rail>
-    <!-- 底部导航栏（手机用） -->
-    <mdui-navigation-bar id="mainNavBar" class="app-bottom-bar" value="home" label-visibility="labeled">
-      <mdui-navigation-bar-item id="barHome" value="home" icon="home">首页</mdui-navigation-bar-item>
-      <mdui-navigation-bar-item id="barSearch" value="search" icon="search">搜索</mdui-navigation-bar-item>
-      <mdui-navigation-bar-item id="barImages" value="images" icon="archive">下载</mdui-navigation-bar-item>
-    </mdui-navigation-bar>
+
 
     <!-- 顶部应用栏 -->
     <mdui-top-app-bar variant="center-aligned">
@@ -531,18 +516,6 @@
   </mdui-layout>
 
   <script>
-    queueMicrotask(() => {
-      try {
-        if (typeof mdui !== 'undefined') {
-          // Ensure nav visibility is synced as early as possible.
-          applyBreakpointLayout();
-        }
-      } catch (error) {
-        // ignore
-      }
-    });
-
-
     function applyBreakpointLayout() {
       let isMdUp = false;
       try {
@@ -551,8 +524,6 @@
       } catch (error) {
         isMdUp = window.matchMedia('(min-width: 840px)').matches;
       }
-      document.documentElement.classList.toggle('bp-md-up', isMdUp);
-      document.documentElement.classList.toggle('bp-md-down', !isMdUp);
       navRail.hidden = !isMdUp;
       navBar.hidden = isMdUp;
     }
@@ -616,7 +587,7 @@
       mdui.snackbar({
         message,
         action: "阅",
-        onActionClick: function() { /* do nothing, just close */}
+        onActionClick: function () { /* do nothing, just close */ }
       });
     }
 
