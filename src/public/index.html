@@ -334,8 +334,8 @@
           <span>狗子的 HubProxy</span>
         </span>
       </mdui-top-app-bar-title>
-      <mdui-button-icon id="themeButton" variant="standard" icon="brightness_auto"
-        aria-label="主题模式：自动跟随系统" title="主题模式：自动跟随系统"></mdui-button-icon>
+      <mdui-button-icon id="themeButton" variant="standard" icon="brightness_auto" aria-label="主题模式：自动跟随系统"
+        title="主题模式：自动跟随系统"></mdui-button-icon>
     </mdui-top-app-bar>
 
     <!-- 内容区域 -->
@@ -1138,7 +1138,7 @@
             const archValue = image && image.architecture ? image.architecture : 'unknown';
             const imageSize = formatSize(Number((image && image.size) || 0));
             const digest = image && image.digest ? image.digest : '';
-            return `<mdui-list-item icon="memory" rounded>
+            return `<mdui-list-item icon="memory" rounded data-digest="${escapeHtml(digest)}">
                 ${escapeHtml(osText + '/' + archValue)} · ${escapeHtml(imageSize)}
                 <span slot="description">${escapeHtml(digest)}</span>
               </mdui-list-item>`;
@@ -1163,6 +1163,19 @@
 
       tagGrid.appendChild(collapse);
       enhanceCodeBoxes(tagGrid);
+
+      tagGrid.querySelectorAll('mdui-list-item[data-digest]').forEach((item) => {
+        item.addEventListener('click', async () => {
+          const text = item.dataset.digest;
+          if (!text) return;
+          try {
+            await copyText(text);
+            showMessage('已复制到剪贴板');
+          } catch {
+            showMessage('复制失败，请手动复制');
+          }
+        });
+      });
     }
 
     function applyTagFilter() {
