@@ -11,8 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-gonic/gin"
 	"hubproxy/utils"
+
+	"github.com/gin-gonic/gin"
 )
 
 // SearchResult Docker Hub搜索结果
@@ -37,6 +38,14 @@ type Repository struct {
 	Organization  string `json:"affiliation"`
 	PullsLastWeek int    `json:"pulls_last_week"`
 	Namespace     string `json:"namespace"`
+}
+
+// RepositoryDetail 仓库详情
+type RepositoryDetail struct {
+	Name            string `json:"name"`
+	Namespace       string `json:"namespace"`
+	Description     string `json:"description"`
+	FullDescription string `json:"full_description"`
 }
 
 // TagInfo 标签信息
@@ -88,6 +97,8 @@ type Cache struct {
 	mu      sync.RWMutex
 	maxSize int
 }
+
+const DOCKER_HUB_REGISTRY_BASE = "https://registry.hub.docker.com/v2"
 
 var (
 	searchCache = &Cache{
@@ -209,18 +220,17 @@ func searchDockerHubWithDepth(ctx context.Context, query string, page, pageSize 
 		}
 	}
 
-	baseURL := "https://registry.hub.docker.com/v2"
 	var fullURL string
 	var params url.Values
 
 	if isUserRepo && namespace != "" {
-		fullURL = fmt.Sprintf("%s/repositories/%s/", baseURL, namespace)
+		fullURL = fmt.Sprintf("%s/repositories/%s/", DOCKER_HUB_REGISTRY_BASE, namespace)
 		params = url.Values{
 			"page":      {fmt.Sprintf("%d", page)},
 			"page_size": {fmt.Sprintf("%d", pageSize)},
 		}
 	} else {
-		fullURL = baseURL + "/search/repositories/"
+		fullURL = DOCKER_HUB_REGISTRY_BASE + "/search/repositories/"
 		params = url.Values{
 			"query":     {query},
 			"page":      {fmt.Sprintf("%d", page)},
@@ -349,7 +359,7 @@ func getRepositoryTags(ctx context.Context, namespace, name string, page, pageSi
 		return result.Tags, result.HasMore, nil
 	}
 
-	baseURL := fmt.Sprintf("https://registry.hub.docker.com/v2/repositories/%s/%s/tags", namespace, name)
+	baseURL := fmt.Sprintf("%s/repositories/%s/%s/tags", DOCKER_HUB_REGISTRY_BASE, namespace, name)
 	params := url.Values{}
 	params.Set("page", fmt.Sprintf("%d", page))
 	params.Set("page_size", fmt.Sprintf("%d", pageSize))
@@ -368,6 +378,57 @@ func getRepositoryTags(ctx context.Context, namespace, name string, page, pageSi
 	searchCache.SetWithTTL(cacheKey, result, 30*time.Minute)
 
 	return pageResult.Results, hasMore, nil
+}
+
+func getRepositoryDetail(_ context.Context, namespace, name string) (*RepositoryDetail, error) {
+	if namespace == "" || name == "" {
+		return nil, fmt.Errorf("无效输入：命名空间和名称不能为空")
+	}
+
+	cacheKey := fmt.Sprintf("repo-detail:%s:%s", namespace, name)
+	if cached, ok := searchCache.Get(cacheKey); ok {
+		return cached.(*RepositoryDetail), nil
+	}
+
+	fullURL := fmt.Sprintf("%s/repositories/%s/%s", DOCKER_HUB_REGISTRY_BASE, namespace, name)
+	resp, err := utils.GetSearchHTTPClient().Get(fullURL)
+	if err != nil {
+		return nil, fmt.Errorf("请求仓库详情失败: %v", err)
+	}
+	defer safeCloseResponseBody(resp.Body, "仓库详情响应体")
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取仓库详情失败: %v", err)
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			return nil, fmt.Errorf("请求过于频繁，请稍后重试")
+		case http.StatusNotFound:
+			return nil, fmt.Errorf("未找到仓库详情")
+		case http.StatusBadGateway, http.StatusServiceUnavailable:
+			return nil, fmt.Errorf("docker hub 服务暂时不可用，请稍后重试")
+		default:
+			return nil, fmt.Errorf("请求仓库详情失败: 状态码=%d, 响应=%s", resp.StatusCode, string(body))
+		}
+	}
+
+	detail := &RepositoryDetail{}
+	if err := json.Unmarshal(body, detail); err != nil {
+		return nil, fmt.Errorf("解析仓库详情失败: %v", err)
+	}
+
+	if detail.Namespace == "" {
+		detail.Namespace = namespace
+	}
+	if detail.Name == "" {
+		detail.Name = name
+	}
+
+	searchCache.SetWithTTL(cacheKey, detail, 30*time.Minute)
+	return detail, nil
 }
 
 func fetchTagPage(ctx context.Context, url string, maxRetries int) (*struct {
@@ -513,5 +574,23 @@ func RegisterSearchRoute(r *gin.Engine) {
 		} else {
 			c.JSON(http.StatusOK, tags)
 		}
+	})
+
+	r.GET("/repo/:namespace/:name", func(c *gin.Context) {
+		namespace := c.Param("namespace")
+		name := c.Param("name")
+
+		if namespace == "" || name == "" {
+			sendErrorResponse(c, "命名空间和名称不能为空")
+			return
+		}
+
+		detail, err := getRepositoryDetail(c.Request.Context(), namespace, name)
+		if err != nil {
+			sendErrorResponse(c, err.Error())
+			return
+		}
+
+		c.JSON(http.StatusOK, detail)
 	})
 }

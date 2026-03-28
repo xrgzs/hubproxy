@@ -10,6 +10,8 @@
   <link rel="icon" href="/favicon.ico">
   <link rel="preconnect" href="https://s4.zstatic.net">
   <script src="https://s4.zstatic.net/npm/mdui@2.1.4/mdui.global.js"></script>
+  <script src="https://s4.zstatic.net/npm/marked@17.0.5/lib/marked.umd.js"></script>
+  <script src="https://s4.zstatic.net/npm/dompurify@3.3.3/dist/purify.min.js"></script>
   <link rel="stylesheet" href="https://s4.zstatic.net/npm/mdui@2.1.4/mdui.css">
   <link rel="stylesheet" href="https://s4.zstatic.net/npm/material-icons@1.13.14/iconfont/material-icons.css">
   <link rel="stylesheet" href="https://s4.zstatic.net/npm/@fontsource/roboto@5.2.10/index.css">
@@ -169,6 +171,13 @@
       gap: 8px;
     }
 
+    .repo-header-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
     .tag-collapse-body {
       margin-left: 2.5rem;
       padding: 4px 0 12px;
@@ -206,6 +215,42 @@
       font-size: 0.84rem;
       color: rgb(var(--mdui-color-on-surface-variant));
       margin-top: 2px;
+    }
+
+    .markdown-dialog-body {
+      max-height: min(70vh, 720px);
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 4px;
+      line-height: 1.75;
+      word-break: break-word;
+      overflow-wrap: anywhere;
+      max-width: 100%;
+    }
+
+    .markdown-dialog-body img {
+      max-width: 100%;
+      height: auto;
+    }
+
+    .markdown-dialog-body pre,
+    .markdown-dialog-body code,
+    .markdown-dialog-body table {
+      max-width: 100%;
+    }
+
+    .markdown-dialog-body pre {
+      white-space: pre;
+      word-break: normal;
+      overflow-x: auto;
+    }
+
+    .markdown-dialog-body table {
+      display: block;
+      width: max-content;
+      min-width: 100%;
+      overflow-x: auto;
+      white-space: nowrap;
     }
 
     .app-rail,
@@ -747,6 +792,7 @@
     let currentTagPage = 1;
     let totalTagPages = 1;
     let currentPageTags = [];
+    const repoMarkdownCache = new Map();
 
     function setLoading(loading) {
       loadingBar.classList.toggle('hidden', !loading);
@@ -835,6 +881,87 @@
       tagPageInfo.textContent = `第 ${currentTagPage} / ${totalTagPages} 页`;
     }
 
+    function renderMarkdown(markdown) {
+      if (typeof marked === 'undefined' || typeof DOMPurify === 'undefined') {
+        return `<pre>${escapeHtml(markdown || '')}</pre>`;
+      }
+
+      const parsed = marked.parse(markdown || '', {
+        breaks: true,
+        gfm: true,
+      });
+      return DOMPurify.sanitize(parsed);
+    }
+
+    function buildMarkdownDialogBody(repo, markdown) {
+      const container = document.createElement('div');
+      container.className = 'mdui-prose markdown-dialog-body';
+
+      if ((markdown || '').trim()) {
+        container.innerHTML = renderMarkdown(markdown);
+      } else {
+        container.innerHTML = '<mdui-alert icon="info" variant="tonal">该仓库暂无仓库详情内容。</mdui-alert>';
+      }
+
+      enhanceCodeBoxes(container);
+      return container;
+    }
+
+    async function fetchRepositoryMarkdown(repo) {
+      const repoInfo = parseRepositoryInfo(repo);
+      if (!repoInfo.namespace || !repoInfo.name) {
+        throw new Error('仓库信息不完整');
+      }
+
+      const cacheKey = `${repoInfo.namespace}/${repoInfo.name}`;
+      if (repoMarkdownCache.has(cacheKey)) {
+        return repoMarkdownCache.get(cacheKey);
+      }
+
+      const response = await fetch(`/repo/${encodeURIComponent(repoInfo.namespace)}/${encodeURIComponent(repoInfo.name)}`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || '获取仓库详情失败');
+
+      const markdown = data.full_description || '';
+      repoMarkdownCache.set(cacheKey, markdown);
+      return markdown;
+    }
+
+    async function openRepositoryMarkdown(repo, triggerButton) {
+      if (!repo) {
+        showMessage('未选择仓库');
+        return;
+      }
+
+      const button = triggerButton || null;
+      if (button) setButtonLoading(button, true);
+
+      try {
+        const repoInfo = parseRepositoryInfo(repo);
+        const markdown = await fetchRepositoryMarkdown(repo);
+        mdui.dialog({
+          headline: `${repoInfo.fullName} 仓库详情`,
+          description: '以下内容来自 Docker Hub 仓库详情。',
+          body: buildMarkdownDialogBody(repo, markdown),
+          closeOnEsc: true,
+          closeOnOverlayClick: true,
+          actions: [
+            {
+              text: '关闭',
+            },
+          ],
+        });
+      } catch (error) {
+        showMessage(error.message || '获取仓库详情失败');
+      } finally {
+        if (button) setButtonLoading(button, false);
+      }
+    }
+
     function buildResultCard(repo) {
       const displayName = getDisplayRepoName(repo);
       const description = repo.short_description || '暂无描述';
@@ -887,9 +1014,17 @@
       repoHeader.innerHTML = `
         <div class="title-row">${repoInfo.fullName}</div>
         <p class="desc mdui-prose">${currentRepo.short_description || '暂无描述'}</p>
+        <div class="repo-header-actions">
+          <mdui-button id="viewRepoMarkdownButton" variant="tonal" icon="article">查看仓库详情</mdui-button>
+        </div>
         <p class="code-box">${pullCommand}</p>
       `;
       enhanceCodeBoxes(repoHeader);
+
+      const viewRepoMarkdownButton = document.getElementById('viewRepoMarkdownButton');
+      if (viewRepoMarkdownButton) {
+        viewRepoMarkdownButton.addEventListener('click', () => openRepositoryMarkdown(currentRepo, viewRepoMarkdownButton));
+      }
     }
 
     function renderTagList(tags) {
@@ -951,15 +1086,15 @@
         const images = Array.isArray(tag.images) ? tag.images : [];
         const imageItemsHtml = images.length > 0
           ? `<mdui-list>${images.map((image) => {
-              const osText = image && image.os ? image.os : 'unknown';
-              const archValue = image && image.architecture ? image.architecture : 'unknown';
-              const imageSize = formatSize(Number((image && image.size) || 0));
-              const digest = image && image.digest ? image.digest : '';
-              return `<mdui-list-item icon="memory" rounded>
+            const osText = image && image.os ? image.os : 'unknown';
+            const archValue = image && image.architecture ? image.architecture : 'unknown';
+            const imageSize = formatSize(Number((image && image.size) || 0));
+            const digest = image && image.digest ? image.digest : '';
+            return `<mdui-list-item icon="memory" rounded>
                 ${escapeHtml(osText + '/' + archValue)} · ${escapeHtml(imageSize)}
                 <span slot="description">${escapeHtml(digest)}</span>
               </mdui-list-item>`;
-            }).join('')}</mdui-list>`
+          }).join('')}</mdui-list>`
           : '<mdui-alert icon="info" variant="tonal">该标签暂无镜像分层信息</mdui-alert>';
 
         const node = document.createElement('mdui-collapse-item');
