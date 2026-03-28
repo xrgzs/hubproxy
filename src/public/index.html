@@ -613,7 +613,11 @@
     }
 
     function showMessage(message) {
-      mdui.snackbar({ message, placement: 'top' });
+      mdui.snackbar({
+        message,
+        action: "阅",
+        onActionClick: function() { /* do nothing, just close */}
+      });
     }
 
     function syncRouteState(tabName, queryText = '') {
