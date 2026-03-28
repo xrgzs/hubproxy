@@ -1019,7 +1019,6 @@
           <div class="meta-row">
             <span><mdui-icon name="star"></mdui-icon>${formatNumber(repo.star_count || 0)}</span>
             <span><mdui-icon name="download"></mdui-icon>${formatNumber(repo.pull_count || 0)}</span>
-            <span><mdui-icon name="update"></mdui-icon>${formatTimeAgo(repo.last_updated)}</span>
           </div>
         </mdui-card>
       `;
@@ -1077,38 +1076,6 @@
       collapse.accordion = true;
 
       tags.forEach((tag, index) => {
-
-        // {
-        //     "name": "alpine-arm64",
-        //     "full_size": 63154406,
-        //     "last_updated": "2026-03-22T18:30:19.742421Z",
-        //     "last_pusher": "",
-        //     "images": [
-        //         {
-        //             "architecture": "arm64",
-        //             "features": "",
-        //             "digest": "sha256:2eaf2e16b60df11b865e7c6aa81f45399e0c20cf7ba17646a5a705e62fc2d5aa",
-        //             "os": "linux",
-        //             "os_features": "",
-        //             "size": 63154406
-        //         },
-        //         {
-        //             "architecture": "unknown",
-        //             "features": "",
-        //             "digest": "sha256:7dad9777808ee27b1cd831512c4f8b7ef177518a7c8fbd30de6b7d1f92afdde4",
-        //             "os": "unknown",
-        //             "os_features": "",
-        //             "size": 42900
-        //         }
-        //     ],
-        //     "vulnerabilities": {
-        //         "critical": 0,
-        //         "high": 0,
-        //         "medium": 0,
-        //         "low": 0,
-        //         "unknown": 0
-        //     }
-        // }
 
 
         const tagName = tag.name || 'unknown';
