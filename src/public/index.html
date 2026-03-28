@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" class="mdui-theme-auto">
 
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
   <meta name="description" content="狗子的 HubProxy - GitHub 加速、Docker 镜像搜索与离线下载">
   <meta name="keywords" content="狗子的 HubProxy, GitHub 加速, Docker 镜像搜索, Docker 离线下载">
   <title>狗子的 HubProxy</title>
@@ -333,8 +334,8 @@
           <span>狗子的 HubProxy</span>
         </span>
       </mdui-top-app-bar-title>
-      <mdui-button-icon id="themeButton" icon="dark_mode" aria-label="切换主题"
-        style="position: absolute; top: 50%; right: max(12px, env(safe-area-inset-right)); transform: translateY(-50%);"></mdui-button-icon>
+      <mdui-button-icon id="themeButton" variant="standard" icon="brightness_auto"
+        aria-label="主题模式：自动跟随系统" title="主题模式：自动跟随系统"></mdui-button-icon>
     </mdui-top-app-bar>
 
     <!-- 内容区域 -->
@@ -581,21 +582,34 @@
     };
 
     const themeButton = document.getElementById('themeButton');
+    const THEME_STORAGE_KEY = 'theme-mode';
+    const THEME_MODE_SEQUENCE = ['auto', 'light', 'dark'];
+    const THEME_MODE_META = {
+      auto: { icon: 'brightness_auto', label: '自动跟随系统' },
+      light: { icon: 'light_mode', label: '浅色' },
+      dark: { icon: 'dark_mode', label: '深色' },
+    };
 
-    function setTheme(theme) {
-      mdui.setTheme(theme);
-      localStorage.setItem('theme', theme);
-      themeButton.icon = theme === 'dark' ? 'light_mode' : 'dark_mode';
+    function getStoredThemeMode() {
+      const savedThemeMode = localStorage.getItem(THEME_STORAGE_KEY);
+      return savedThemeMode === 'dark' || savedThemeMode === 'light' || savedThemeMode === 'auto'
+        ? savedThemeMode
+        : 'auto';
+    }
+
+    function applyThemeMode(mode, persist = true) {
+      mdui.setTheme(mode);
+      const themeMeta = THEME_MODE_META[mode] || THEME_MODE_META.auto;
+      const buttonLabel = `主题模式：${themeMeta.label}`;
+      themeButton.icon = themeMeta.icon;
+      themeButton.setAttribute('aria-label', buttonLabel);
+      themeButton.setAttribute('title', buttonLabel);
+
+      if (persist) localStorage.setItem(THEME_STORAGE_KEY, mode);
     }
 
     function initTheme() {
-      const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'dark' || savedTheme === 'light') {
-        setTheme(savedTheme);
-        return;
-      }
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      setTheme(prefersDark ? 'dark' : 'light');
+      applyThemeMode(getStoredThemeMode(), false);
     }
 
     function showMessage(message) {
@@ -633,8 +647,11 @@
     });
 
     themeButton.addEventListener('click', () => {
-      const currentTheme = localStorage.getItem('theme') || 'light';
-      setTheme(currentTheme === 'dark' ? 'light' : 'dark');
+      const currentMode = getStoredThemeMode();
+      const currentIndex = THEME_MODE_SEQUENCE.indexOf(currentMode);
+      const nextMode = THEME_MODE_SEQUENCE[(currentIndex + 1) % THEME_MODE_SEQUENCE.length];
+      applyThemeMode(nextMode);
+      showMessage(`主题已切换为${THEME_MODE_META[nextMode].label}`);
     });
 
     const githubLinkInput = document.getElementById('githubLinkInput');
