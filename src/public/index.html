@@ -616,7 +616,21 @@
       mdui.snackbar({ message, placement: 'top' });
     }
 
-    function setActiveView(name) {
+    function syncRouteState(tabName, queryText = '') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('tab', tabName);
+
+      const query = (queryText || '').trim();
+      if (query) {
+        url.searchParams.set('q', query);
+      } else {
+        url.searchParams.delete('q');
+      }
+
+      history.replaceState({}, '', url);
+    }
+
+    function setActiveView(name, options = {}) {
       Object.entries(views).forEach(([key, el]) => {
         el.classList.toggle('active', key === name);
       });
@@ -624,9 +638,10 @@
       navRail.value = name;
       navBar.value = name;
 
-      const url = new URL(window.location.href);
-      url.searchParams.set('tab', name);
-      history.replaceState({}, '', url);
+      if (options.syncRoute !== false) {
+        const persistedQuery = (searchInput && searchInput.value ? searchInput.value : currentQuery || '').trim();
+        syncRouteState(name, persistedQuery);
+      }
     }
 
 
@@ -1196,6 +1211,7 @@
       }
 
       currentQuery = query;
+      syncRouteState('search', currentQuery);
       setLoading(true);
 
       try {
@@ -1514,12 +1530,17 @@
     function initFromQuery() {
       const params = new URLSearchParams(window.location.search);
       const tab = params.get('tab');
-      if (tab && views[tab]) setActiveView(tab);
-
       const searchQuery = params.get('q');
+
       if (searchQuery) {
         searchInput.value = searchQuery;
-        setActiveView('search');
+        currentQuery = searchQuery;
+      }
+
+      const initialTab = tab && views[tab] ? tab : 'home';
+      setActiveView(initialTab, { syncRoute: false });
+
+      if (searchQuery && initialTab === 'search') {
         currentPage = 1;
         performSearch();
       }
